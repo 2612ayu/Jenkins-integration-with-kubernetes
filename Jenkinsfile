@@ -1,49 +1,43 @@
 pipeline {
 
-  environment {
-    dockerimagename = "thetips4you/nodeapp"
-    dockerImage = ""
-  }
-
-  agent any
-
-  stages {
-
-    stage('Checkout Source') {
-      steps {
-        git 'https://github.com/shazforiot/nodeapp_test.git'
-      }
+    triggers {
+        githubPush()
     }
-
-    stage('Build image') {
-      steps{
-        script {
-          dockerImage = docker.build dockerimagename
+    environment {
+        GIT_REPO = 'https://github.com/2612ayu/Jenkins-integration-with-kubernetes.git'
+        BRANCH = 'main'
+    }
+    agent any
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
         }
-      }
-    }
-
-    stage('Pushing Image') {
-      environment {
-               registryCredential = 'dockerhublogin'
-           }
-      steps{
-        script {
-          docker.withRegistry( 'https://registry.hub.docker.com', registryCredential ) {
-            dockerImage.push("latest")
-          }
+        stage('Install dependencies') {
+            steps {
+                sh 'npm install'
+            }
         }
-      }
-    }
-
-    stage('Deploying App to Kubernetes') {
-      steps {
-        script {
-          kubernetesDeploy(configs: "deploymentservice.yml", kubeconfigId: "kubernetes")
+        stage('Docker Build') {
+            steps {
+                script { 
+                    dockerImage = docker.build registry + ":$BUILD_NUMBER"
+                }
+            }
         }
-      }
+        
+        stage('Cleaning up') {
+            steps {
+                script {
+                    sh "docker rmi -f $registry:$BUILD_NUMBER"
+                }
+            }
+        }
     }
+}
 
-  }
-
+def fileExists(filePath) {
+    def file = new File(filePath)
+    return file.exists()
 }
